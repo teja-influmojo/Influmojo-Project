@@ -176,8 +176,8 @@ const createSendBirdService = () => {
   const createNewChannel = async (userIds, channelName) => {
     const sendbird = initializeSendBird();
     const params = new sendbird.GroupChannelParams();
-    params.addUserIds(userIds);
-    params.name = channelName;
+      params.addUserIds(userIds);
+      params.name = channelName;
     params.isDistinct = true; // This ensures only one channel between same users
 
     return new Promise((resolve, reject) => {
@@ -566,12 +566,406 @@ const createSendBirdService = () => {
   const getCurrentChannel = () => currentChannel;
   const getAllChannels = () => getAllChannelsForAdmin(); // Legacy support
 
+  // File upload functions
+  const uploadFile = async (file, customType = null, data = null) => {
+    if (!currentChannel) {
+      throw new Error('No active channel');
+    }
+
+    const sendbird = initializeSendBird();
+    const params = new sendbird.FileMessageParams();
+    
+    // Set file parameters
+    params.file = file;
+    params.fileName = file.name;
+    params.fileSize = file.size;
+    params.mimeType = file.type;
+    params.customType = customType;
+    params.data = data;
+    params.thumbnailSizes = [
+      { maxWidth: 320, maxHeight: 320 },
+      { maxWidth: 640, maxHeight: 640 }
+    ];
+
+    return new Promise((resolve, reject) => {
+      currentChannel.sendFileMessage(params, (message, error) => {
+        if (error) {
+          console.error('Failed to upload file:', error);
+          reject(error);
+          return;
+        }
+        
+        console.log('File uploaded successfully:', message.name);
+        addMessageToCache(currentChannel, message);
+        resolve(message);
+      });
+    });
+  };
+
+  const uploadImage = async (imageFile, customType = null, data = null) => {
+    if (!currentChannel) {
+      throw new Error('No active channel');
+    }
+
+    const sendbird = initializeSendBird();
+    const params = new sendbird.FileMessageParams();
+    
+    // Set image parameters
+    params.file = imageFile;
+    params.fileName = imageFile.name;
+    params.fileSize = imageFile.size;
+    params.mimeType = imageFile.type;
+    params.customType = customType || 'image';
+    params.data = data;
+    
+    // Add image-specific parameters
+    params.thumbnailSizes = [
+      { maxWidth: 320, maxHeight: 320 },
+      { maxWidth: 640, maxHeight: 640 }
+    ];
+    params.requireAuth = false;
+    params.thumbnailIndex = 0;
+
+    return new Promise((resolve, reject) => {
+      currentChannel.sendFileMessage(params, (message, error) => {
+        if (error) {
+          console.error('Failed to upload image:', error);
+          reject(error);
+          return;
+        }
+        
+        console.log('Image uploaded successfully:', message.name);
+        addMessageToCache(currentChannel, message);
+        resolve(message);
+      });
+    });
+  };
+
+  const uploadVideo = async (videoFile, customType = null, data = null) => {
+    if (!currentChannel) {
+      throw new Error('No active channel');
+    }
+
+    const sendbird = initializeSendBird();
+    const params = new sendbird.FileMessageParams();
+    
+    // Set video parameters
+    params.file = videoFile;
+    params.fileName = videoFile.name;
+    params.fileSize = videoFile.size;
+    params.mimeType = videoFile.type;
+    params.customType = customType || 'video';
+    params.data = data;
+    
+    // Add video-specific parameters
+    params.thumbnailSizes = [
+      { maxWidth: 320, maxHeight: 320 }
+    ];
+    params.requireAuth = false;
+
+    return new Promise((resolve, reject) => {
+      currentChannel.sendFileMessage(params, (message, error) => {
+        if (error) {
+          console.error('Failed to upload video:', error);
+          reject(error);
+          return;
+        }
+        
+        console.log('Video uploaded successfully:', message.name);
+        addMessageToCache(currentChannel, message);
+        resolve(message);
+      });
+    });
+  };
+
+  const uploadAudio = async (audioFile, customType = null, data = null) => {
+    if (!currentChannel) {
+      throw new Error('No active channel');
+    }
+
+    const sendbird = initializeSendBird();
+    const params = new sendbird.FileMessageParams();
+    
+    // Set audio parameters
+    params.file = audioFile;
+    params.fileName = audioFile.name;
+    params.fileSize = audioFile.size;
+    params.mimeType = audioFile.type;
+    params.customType = customType || 'audio';
+    params.data = data;
+    params.requireAuth = false;
+
+    return new Promise((resolve, reject) => {
+      currentChannel.sendFileMessage(params, (message, error) => {
+        if (error) {
+          console.error('Failed to upload audio:', error);
+          reject(error);
+          return;
+        }
+        
+        console.log('Audio uploaded successfully:', message.name);
+        addMessageToCache(currentChannel, message);
+        resolve(message);
+      });
+    });
+  };
+
+  const uploadDocument = async (documentFile, customType = null, data = null) => {
+    if (!currentChannel) {
+      throw new Error('No active channel');
+    }
+
+    const sendbird = initializeSendBird();
+    const params = new sendbird.FileMessageParams();
+    
+    // Set document parameters
+    params.file = documentFile;
+    params.fileName = documentFile.name;
+    params.fileSize = documentFile.size;
+    params.mimeType = documentFile.type;
+    params.customType = customType || 'document';
+    params.data = data;
+    params.requireAuth = false;
+
+    return new Promise((resolve, reject) => {
+      currentChannel.sendFileMessage(params, (message, error) => {
+        if (error) {
+          console.error('Failed to upload document:', error);
+          reject(error);
+          return;
+        }
+        
+        console.log('Document uploaded successfully:', message.name);
+        addMessageToCache(currentChannel, message);
+        resolve(message);
+      });
+    });
+  };
+
+  // File download functions
+  const downloadFile = async (message) => {
+    if (!message || !message.url) {
+      throw new Error('Invalid message or file URL');
+    }
+
+    const sendbird = initializeSendBird();
+    
+    return new Promise((resolve, reject) => {
+      sendbird.downloadFile(message.url, (response, error) => {
+        if (error) {
+          console.error('Failed to download file:', error);
+          reject(error);
+          return;
+        }
+        
+        // Create a blob from the response
+        const blob = new Blob([response], { type: message.type });
+        const url = URL.createObjectURL(blob);
+        
+        resolve({
+          url,
+          blob,
+          name: message.name,
+          type: message.type
+        });
+      });
+    });
+  };
+
+  // File preview functions
+  const getFilePreview = async (message) => {
+    if (!message || !message.url) {
+      throw new Error('Invalid message or file URL');
+    }
+
+    const sendbird = initializeSendBird();
+    
+    return new Promise((resolve, reject) => {
+      sendbird.getFilePreview(message.url, (response, error) => {
+        if (error) {
+          console.error('Failed to get file preview:', error);
+          reject(error);
+          return;
+        }
+        
+        // Create a blob from the response
+        const blob = new Blob([response], { type: message.type });
+        const url = URL.createObjectURL(blob);
+        
+        resolve({
+          url,
+          blob,
+          name: message.name,
+          type: message.type
+        });
+      });
+    });
+  };
+
+  const sendFileMessage = async (file, fileType = 'file', progressCallback = null) => {
+    return new Promise((resolve, reject) => {
+      if (!currentChannel) {
+        reject(new Error('No active channel'));
+        return;
+      }
+  
+      console.log('Sending file message:', file.name);
+  
+      const params = sb.BaseMessageCreateParams();
+      params.file = file;
+      params.fileName = file.name;
+      params.fileSize = file.size;
+      params.mimeType = file.type;
+  
+      // Set custom type based on file type
+      params.customType = fileType;
+      
+      // Add metadata
+      params.data = JSON.stringify({
+        fileType: fileType,
+        originalName: file.name,
+        fileSize: formatFileSize(file.size),
+        uploadTime: new Date().toISOString()
+      });
+
+      // Add thumbnails for images and videos
+      if (fileType === 'image' || fileType === 'video') {
+        params.thumbnails = [
+          { url: '', width: 240, height: 240 },  // Small thumbnail
+          { url: '', width: 480, height: 480 },  // Medium thumbnail
+          { url: '', width: 720, height: 720 }   // Large thumbnail
+        ];
+      }
+
+      // Set require_auth to true for secure file access
+      params.requireAuth = true;
+
+      // Add push notification settings
+      params.sendPush = true;
+      params.pushMessageTemplate = {
+        title: 'New file shared',
+        body: `${currentUser.nickname} shared a ${fileType}`
+      };
+  
+      currentChannel.sendFileMessage(params)
+        .onPending((message) => {
+          console.log('File message pending:', message);
+          if (progressCallback) {
+            progressCallback('pending', 0);
+          }
+        })
+        .onFailed((error) => {
+          console.error('File message failed:', error);
+          if (progressCallback) {
+            progressCallback('failed', 0);
+          }
+          reject(error);
+        })
+        .onSucceeded((message) => {
+          console.log('File message succeeded:', message);
+          addMessageToCache(currentChannel, message);
+          if (progressCallback) {
+            progressCallback('succeeded', 100);
+          }
+          resolve(message);
+        })
+        .onUploaded((message) => {
+          console.log('File uploaded:', message);
+          if (progressCallback) {
+            progressCallback('uploaded', 100);
+          }
+        })
+        .onProgress((progress) => {
+          console.log('Upload progress:', progress);
+          if (progressCallback) {
+            progressCallback('uploading', progress);
+          }
+        });
+    });
+  };
+
+  // Send multiple files in a single message
+  const sendMultipleFiles = async (files, progressCallback = null) => {
+    return new Promise((resolve, reject) => {
+      if (!currentChannel) {
+        reject(new Error('No active channel'));
+        return;
+      }
+
+      const filePromises = files.map(file => {
+        const fileType = getFileTypeFromMime(file.type);
+        return sendFileMessage(file, fileType, progressCallback);
+      });
+
+      Promise.all(filePromises)
+        .then(messages => {
+          console.log('All files uploaded successfully:', messages);
+          resolve(messages);
+        })
+        .catch(error => {
+          console.error('Error uploading files:', error);
+          reject(error);
+        });
+    });
+  };
+
+  // Send file from URL
+  const sendFileFromUrl = async (fileUrl, fileName, fileType, fileSize) => {
+    return new Promise((resolve, reject) => {
+      if (!currentChannel) {
+        reject(new Error('No active channel'));
+        return;
+      }
+
+      const params = sb.BaseMessageCreateParams();
+      params.url = fileUrl;
+      params.fileName = fileName;
+      params.fileSize = fileSize;
+      params.customType = fileType;
+      params.requireAuth = true;
+
+      currentChannel.sendFileMessage(params)
+        .onSucceeded((message) => {
+          console.log('File from URL sent successfully:', message);
+          addMessageToCache(currentChannel, message);
+          resolve(message);
+        })
+        .onFailed((error) => {
+          console.error('Failed to send file from URL:', error);
+          reject(error);
+        });
+    });
+  };
+
+  // Helper function to determine file type from MIME type
+  const getFileTypeFromMime = (mimeType) => {
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType.includes('pdf') || 
+        mimeType.includes('document') || 
+        mimeType.includes('text/') ||
+        mimeType.includes('application/')) return 'document';
+    return 'file';
+  };
+  
+  // Helper function to format file size
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   // Return public API
   return {
     // Connection
     connect,
     disconnect,
-    
+    sendFileMessage,
+    getFileTypeFromMime,
+    formatFileSize,
     // Channels
     createOrGetChannel,
     getChannel,
@@ -606,7 +1000,18 @@ const createSendBirdService = () => {
     // Utilities
     findChannelByUsers,
     addMessageToCache,
-    clearChannelCache // Added for debugging
+    clearChannelCache,
+    
+    // File upload methods
+    uploadFile,
+    uploadImage,
+    uploadVideo,
+    uploadAudio,
+    uploadDocument,
+    
+    // File download methods
+    downloadFile,
+    getFilePreview
   };
 };
 
