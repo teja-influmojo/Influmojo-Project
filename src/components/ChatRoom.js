@@ -16,6 +16,7 @@ const ChatRoom = ({ currentUser, onLogout }) => {
   const [onlineUsers, setOnlineUsers] = useState(new Set());
   const messageHandlerRef = useRef(null);
   const currentChannelRef = useRef(null);
+  const isLoadingMessagesRef = useRef(false); // Add flag to prevent race conditions
 
   // Keep refs in sync
   useEffect(() => {
@@ -147,22 +148,55 @@ const ChatRoom = ({ currentUser, onLogout }) => {
     }
   };
 
-  const loadMessages = async (targetChannel) => {
+  const loadMessages = async (targetChannel, preserveLocalMessages = false) => {
+    // Prevent multiple simultaneous message loading
+    if (isLoadingMessagesRef.current) {
+      console.log('Already loading messages, skipping...');
+      return;
+    }
+
+    isLoadingMessagesRef.current = true;
+    
     try {
       console.log('Loading messages for channel:', targetChannel.url);
       
-      // Always load fresh messages from server to ensure we have latest data
+      // Get current local messages if we want to preserve them
+      const currentMessages = preserveLocalMessages ? messages : [];
+      
+      // Load messages from server
       console.log('Loading messages from server');
-      const messages = await sendbirdService.getChannelMessages(targetChannel, 50);
+      const serverMessages = await sendbirdService.getChannelMessages(targetChannel, 50);
       
       // Filter messages to only show between Alice and Bob (additional safety check)
-      const filteredMessages = messages.filter(message => {
+      const filteredMessages = serverMessages.filter(message => {
         const senderId = message._sender.userId;
         return senderId === 'user1' || senderId === 'user2';
       });
       
       console.log('Loaded messages from server:', filteredMessages.length);
-      setMessages(filteredMessages);
+      
+      // Merge local and server messages, removing duplicates
+      let finalMessages = [...filteredMessages];
+      
+      if (preserveLocalMessages && currentMessages.length > 0) {
+        // Add any local messages that aren't in server messages yet
+        currentMessages.forEach(localMsg => {
+          const existsInServer = filteredMessages.some(serverMsg => 
+            serverMsg.messageId === localMsg.messageId || 
+            (serverMsg.reqId && localMsg.reqId && serverMsg.reqId === localMsg.reqId)
+          );
+          
+          if (!existsInServer) {
+            console.log('Adding local message not yet on server:', localMsg.message);
+            finalMessages.push(localMsg);
+          }
+        });
+        
+        // Sort by timestamp
+        finalMessages.sort((a, b) => a.createdAt - b.createdAt);
+      }
+      
+      setMessages(finalMessages);
       
       // Update cache after loading
       filteredMessages.forEach(message => {
@@ -171,6 +205,8 @@ const ChatRoom = ({ currentUser, onLogout }) => {
       
     } catch (error) {
       console.error('Failed to load messages:', error);
+    } finally {
+      isLoadingMessagesRef.current = false;
     }
   };
 
@@ -188,12 +224,16 @@ const ChatRoom = ({ currentUser, onLogout }) => {
       const newChannel = await sendbirdService.createOrGetChannel(userIds, channelName);
       console.log('Channel obtained:', newChannel.url);
       
+      // Check if this is the same channel we already have
+      const isSameChannel = channel && channel.url === newChannel.url;
+      
       setChannel(newChannel);
       setSelectedUser(targetUser);
       setUnreadCount(0); // Reset unread count when starting chat
       
       // Load messages for the channel
-      await loadMessages(newChannel);
+      // If it's the same channel, preserve local messages to avoid losing recent ones
+      await loadMessages(newChannel, isSameChannel);
       
       console.log('Chat started successfully');
       console.log('Channel members:', newChannel.members.map(m => m.userId));
@@ -322,4 +362,4 @@ const ChatRoom = ({ currentUser, onLogout }) => {
   );
 };
 
-export default ChatRoom;
+export default ChatRoom;    

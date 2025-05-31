@@ -8,9 +8,9 @@ const createSendBirdService = () => {
   let currentUser = null;
   let currentChannel = null;
   let channelCache = new Map();
-  let messageHandlers = [];
+  let messageHandlers = new Map(); // Changed to Map for better tracking
   let presenceHandlers = [];
-  let eventCallbacks = new Map(); // Store callbacks for live updates
+  let globalHandlerSetup = false;
 
   // Initialize SendBird instance
   const initializeSendBird = () => {
@@ -50,7 +50,7 @@ const createSendBirdService = () => {
 
   const disconnect = async () => {
     if (!sb) return;
-    
+
     return new Promise((resolve) => {
       // Clean up all handlers before disconnecting
       removeAllMessageHandlers();
@@ -60,16 +60,22 @@ const createSendBirdService = () => {
         currentUser = null;
         currentChannel = null;
         channelCache.clear();
-        eventCallbacks.clear();
+        messageHandlers.clear();
+        globalHandlerSetup = false;
         resolve();
       });
     });
   };
 
-  // Set up global message handler for live updates
+  // Set up global message handler for live updates - FIXED
   const setupGlobalMessageHandler = () => {
+    if (globalHandlerSetup) {
+      console.log('Global handler already setup, skipping');
+      return;
+    }
+
     const sendbird = initializeSendBird();
-    const globalHandlerId = 'global_message_handler';
+    const globalHandlerId = `global_handler_${currentUser.userId}`;
     
     // Remove existing global handler if it exists
     sendbird.removeChannelHandler(globalHandlerId);
@@ -77,16 +83,21 @@ const createSendBirdService = () => {
     const channelHandler = new sendbird.ChannelHandler();
     
     channelHandler.onMessageReceived = (channel, message) => {
-      console.log('Global handler: Message received', message.message);
+      console.log('=== GLOBAL HANDLER: Message received ===');
+      console.log('Message:', message.message);
+      console.log('From:', message._sender.userId);
+      console.log('Channel URL:', channel.url);
+      console.log('Current user:', currentUser?.userId);
       
-      // Always add to cache first
+      // Always add to cache first - this ensures persistence
       addMessageToCache(channel, message);
       
-      // Notify all registered callbacks
-      eventCallbacks.forEach((callback, callbackId) => {
-        if (callback.onMessageReceived) {
+      // Notify all registered message handlers
+      messageHandlers.forEach((handler, handlerId) => {
+        console.log('Notifying handler:', handlerId);
+        if (handler.onMessageReceived) {
           try {
-            callback.onMessageReceived(channel, message);
+            handler.onMessageReceived(channel, message);
           } catch (error) {
             console.error('Error in message callback:', error);
           }
@@ -95,23 +106,26 @@ const createSendBirdService = () => {
     };
 
     channelHandler.onUserJoined = (channel, user) => {
-      eventCallbacks.forEach((callback) => {
-        if (callback.onUserJoined) {
-          callback.onUserJoined(channel, user);
+      console.log('Global handler: User joined', user.userId);
+      messageHandlers.forEach((handler) => {
+        if (handler.onUserJoined) {
+          handler.onUserJoined(channel, user);
         }
       });
     };
 
     channelHandler.onUserLeft = (channel, user) => {
-      eventCallbacks.forEach((callback) => {
-        if (callback.onUserLeft) {
-          callback.onUserLeft(channel, user);
+      console.log('Global handler: User left', user.userId);
+      messageHandlers.forEach((handler) => {
+        if (handler.onUserLeft) {
+          handler.onUserLeft(channel, user);
         }
       });
     };
 
     sendbird.addChannelHandler(globalHandlerId, channelHandler);
-    messageHandlers.push(globalHandlerId);
+    globalHandlerSetup = true;
+    console.log('Global message handler setup completed:', globalHandlerId);
   };
 
   // Channel utility functions
@@ -164,7 +178,7 @@ const createSendBirdService = () => {
     const params = new sendbird.GroupChannelParams();
     params.addUserIds(userIds);
     params.name = channelName;
-    params.isDistinct = true;
+    params.isDistinct = true; // This ensures only one channel between same users
 
     return new Promise((resolve, reject) => {
       sendbird.GroupChannel.createChannel(params, (channel, error) => {
@@ -172,6 +186,7 @@ const createSendBirdService = () => {
           reject(error);
           return;
         }
+        console.log('New channel created:', channel.url);
         resolve(channel);
       });
     });
@@ -179,32 +194,38 @@ const createSendBirdService = () => {
 
   const createOrGetChannel = async (userIds, channelName) => {
     const channelKey = generateChannelKey(userIds);
+    console.log('Getting/creating channel for key:', channelKey);
     
-    // Check cache first
-    if (channelCache.has(channelKey)) {
-      const cachedChannel = channelCache.get(channelKey);
-      currentChannel = cachedChannel.channel;
-      return cachedChannel.channel;
-    }
-
     try {
-      // Try to find existing channel
+      // Always try to find existing channel first (don't rely on cache for channel creation)
       let channel = await findExistingChannel(userIds);
       
       // Create new channel if none exists
       if (!channel) {
+        console.log('No existing channel found, creating new one');
         channel = await createNewChannel(userIds, channelName);
+      } else {
+        console.log('Found existing channel:', channel.url);
       }
 
-      // Cache the channel
-      channelCache.set(channelKey, {
-        channel,
-        messages: []
-      });
+      // Initialize cache entry if it doesn't exist
+      if (!channelCache.has(channelKey)) {
+        console.log('Initializing cache for channel:', channelKey);
+        channelCache.set(channelKey, {
+          channel,
+          messages: []
+        });
+      } else {
+        // Update the channel reference in cache
+        const cached = channelCache.get(channelKey);
+        cached.channel = channel;
+      }
 
       currentChannel = channel;
+      console.log('Channel ready:', channel.url);
       return channel;
     } catch (error) {
+      console.error('Error in createOrGetChannel:', error);
       throw error;
     }
   };
@@ -224,7 +245,7 @@ const createSendBirdService = () => {
     });
   };
 
-  // Message functions
+  // Message functions - FIXED
   const sendMessage = async (message) => {
     if (!currentChannel) {
       throw new Error('No active channel');
@@ -237,47 +258,63 @@ const createSendBirdService = () => {
     return new Promise((resolve, reject) => {
       currentChannel.sendUserMessage(params, (sentMessage, error) => {
         if (error) {
+          console.error('Failed to send message:', error);
           reject(error);
           return;
         }
         
-        // Update cache immediately
+        console.log('Message sent successfully:', sentMessage.message);
+        
+        // Add to cache immediately for better consistency
         addMessageToCache(currentChannel, sentMessage);
+        
         resolve(sentMessage);
       });
     });
   };
 
-  const getPreviousMessages = async (limit = 50) => {
-    if (!currentChannel) {
-      throw new Error('No active channel');
-    }
-
-    const channelKey = getChannelKey(currentChannel);
+  // IMPROVED: Better message loading with delay option for real-time sync
+  const getChannelMessages = async (channel, limit = 50, forceRefresh = false, delayMs = 0) => {
+    const channelKey = getChannelKey(channel);
     
-    // Return cached messages if available
-    if (channelCache.has(channelKey)) {
+    // Add small delay if requested (useful after sending messages)
+    if (delayMs > 0) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+    
+    // If not forcing refresh, check cache first
+    if (!forceRefresh && channelCache.has(channelKey)) {
       const cached = channelCache.get(channelKey);
       if (cached.messages.length > 0) {
+        console.log('Returning cached messages:', cached.messages.length);
         return cached.messages;
       }
     }
 
+    console.log('Loading messages from server for channel:', channel.url);
+    
     return new Promise((resolve, reject) => {
-      const messageListQuery = currentChannel.createPreviousMessageListQuery();
+      const messageListQuery = channel.createPreviousMessageListQuery();
       messageListQuery.limit = limit;
       messageListQuery.reverse = false;
 
       messageListQuery.load((messages, error) => {
         if (error) {
+          console.error('Failed to load messages:', error);
           reject(error);
           return;
         }
-        
+
         const reversedMessages = messages.reverse();
+        console.log('Loaded messages from server:', reversedMessages.length);
         
-        // Update cache
-        if (channelCache.has(channelKey)) {
+        // Update cache with fresh messages
+        if (!channelCache.has(channelKey)) {
+          channelCache.set(channelKey, {
+            channel,
+            messages: reversedMessages
+          });
+        } else {
           const cached = channelCache.get(channelKey);
           cached.messages = reversedMessages;
         }
@@ -287,26 +324,23 @@ const createSendBirdService = () => {
     });
   };
 
-  const getChannelMessages = async (channel, limit = 50) => {
-    return new Promise((resolve, reject) => {
-      const messageListQuery = channel.createPreviousMessageListQuery();
-      messageListQuery.limit = limit;
-      messageListQuery.reverse = false;
+  const getPreviousMessages = async (limit = 50) => {
+    if (!currentChannel) {
+      throw new Error('No active channel');
+    }
 
-      messageListQuery.load((messages, error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve(messages.reverse());
-      });
-    });
+    return getChannelMessages(currentChannel, limit, true); // Always force refresh
   };
 
-  // Cache management
+  // Cache management - IMPROVED
   const addMessageToCache = (channel, message) => {
     const channelKey = getChannelKey(channel);
-    if (!channelKey) return;
+    if (!channelKey) {
+      console.warn('Cannot add message to cache: invalid channel key');
+      return;
+    }
+
+    console.log('Adding message to cache for channel:', channelKey);
 
     // Ensure channel is in cache
     if (!channelCache.has(channelKey)) {
@@ -317,14 +351,34 @@ const createSendBirdService = () => {
     }
 
     const cached = channelCache.get(channelKey);
-    const messageExists = cached.messages.some(msg => 
-      msg.messageId === message.messageId || 
-      (msg.reqId && msg.reqId === message.reqId)
-    );
+    
+    // Check for duplicate messages more thoroughly
+    const messageExists = cached.messages.some(msg => {
+      // Check by message ID first
+      if (msg.messageId && message.messageId && msg.messageId === message.messageId) {
+        return true;
+      }
+      
+      // Check by request ID if message ID not available
+      if (msg.reqId && message.reqId && msg.reqId === message.reqId) {
+        return true;
+      }
+      
+      // Check by timestamp and content as fallback
+      if (msg.createdAt === message.createdAt && 
+          msg.message === message.message && 
+          msg._sender.userId === message._sender.userId) {
+        return true;
+      }
+      
+      return false;
+    });
 
     if (!messageExists) {
       cached.messages.push(message);
-      console.log('Message added to cache:', message.message);
+      console.log('Message added to cache. Total messages:', cached.messages.length);
+    } else {
+      console.log('Message already exists in cache, skipping');
     }
   };
 
@@ -333,6 +387,15 @@ const createSendBirdService = () => {
     return channelCache.has(channelKey) 
       ? channelCache.get(channelKey).messages 
       : [];
+  };
+
+  // Clear cache for a channel - useful for debugging
+  const clearChannelCache = (channel) => {
+    const channelKey = getChannelKey(channel);
+    if (channelCache.has(channelKey)) {
+      channelCache.delete(channelKey);
+      console.log('Cache cleared for channel:', channelKey);
+    }
   };
 
   // User management
@@ -406,11 +469,15 @@ const createSendBirdService = () => {
     }
   };
 
-  // Event handlers - Updated approach
+  // Event handlers - IMPROVED
   const addMessageHandler = (handlerId, handler) => {
-    // Store the callback for the global handler to use
-    eventCallbacks.set(handlerId, handler);
-    console.log('Message handler added:', handlerId);
+    console.log('Adding message handler:', handlerId);
+    messageHandlers.set(handlerId, handler);
+    
+    // Ensure global handler is setup
+    if (!globalHandlerSetup && currentUser) {
+      setupGlobalMessageHandler();
+    }
   };
 
   const addPresenceHandler = (handler) => {
@@ -431,18 +498,22 @@ const createSendBirdService = () => {
   };
 
   const removeMessageHandler = (handlerId) => {
-    // Remove from event callbacks
-    eventCallbacks.delete(handlerId);
-    console.log('Message handler removed:', handlerId);
+    console.log('Removing message handler:', handlerId);
+    messageHandlers.delete(handlerId);
   };
 
   const removeAllMessageHandlers = () => {
     const sendbird = initializeSendBird();
-    messageHandlers.forEach(handlerId => {
-      sendbird.removeChannelHandler(handlerId);
-    });
-    messageHandlers.length = 0;
-    eventCallbacks.clear();
+    
+    // Remove global handler
+    if (currentUser) {
+      const globalHandlerId = `global_handler_${currentUser.userId}`;
+      sendbird.removeChannelHandler(globalHandlerId);
+    }
+    
+    messageHandlers.clear();
+    globalHandlerSetup = false;
+    console.log('All message handlers removed');
   };
 
   const removeAllPresenceHandlers = () => {
@@ -534,7 +605,8 @@ const createSendBirdService = () => {
     
     // Utilities
     findChannelByUsers,
-    addMessageToCache
+    addMessageToCache,
+    clearChannelCache // Added for debugging
   };
 };
 
