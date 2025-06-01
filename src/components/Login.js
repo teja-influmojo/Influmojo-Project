@@ -10,11 +10,10 @@ const Login = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
 
   const predefinedUsers = [
-    { userId: 'user1', nickname: 'Alice', role: 'Customer' },
-    { userId: 'user2', nickname: 'Bob', role: 'Customer' },
-    { userId: 'admin', nickname: 'Admin', role: 'Administrator' },
-    { userId: 'agent1', nickname: 'Agent Smith', role: 'Support Agent' },
-    { userId: 'agent2', nickname: 'Agent Johnson', role: 'Support Agent' }
+    { userId: 'user1', nickname: 'Alice', role: 'Brand' },
+    { userId: 'user2', nickname: 'Bob', role: 'Influencer' },
+    { userId: 'user3', nickname: 'Charlie', role: 'Support Agent' },
+    { userId: 'user4', nickname: 'David', role: 'Support Agent' }
   ];
 
   const handlePredefinedLogin = async (user) => {
@@ -138,14 +137,7 @@ const Login = ({ onLogin }) => {
           )}
         </div>
 
-        <div className="login-info">
-          <h4>Role Descriptions:</h4>
-          <ul>
-            <li><strong>Customer:</strong> Can chat with other customers and purchase packages</li>
-            <li><strong>Support Agent:</strong> Can request to join customer conversations</li>
-            <li><strong>Administrator:</strong> Can view all conversations and manage join requests</li>
-          </ul>
-        </div>
+       
       </div>
     </div>
   );

@@ -209,7 +209,7 @@ const AdminPanel = ({ allChannels, allUsers, onJoinConversation, currentUser }) 
                           </span>
                         </div>
                         <div className="user-status">
-                          <span className={`status-indicator ${user.connectionStatus === 'online' ? 'online' : 'offline'}`}>
+                          <span className={`status-indicator ${user.connectionStatus === 'online' ? 'online' : 'available'}`}>
                             ● {user.connectionStatus === 'online' ? 'Online' : 'Offline'}
                           </span>
                         </div>

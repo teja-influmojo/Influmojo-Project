@@ -1,10 +1,10 @@
 // src/components/UserList.js
 import React from 'react';
 
-const UserList = ({ users, onUserSelect, loading, selectedUser, onlineUsers, unreadCounts }) => {
+const UserList = ({ users, onUserSelect, loading, selectedUser, onlineUsers, unreadCounts, headerText }) => {
   return (
     <div className="user-list">
-      <h3>Available Users</h3>
+      <h3>{headerText}</h3>
       
       {users.length === 0 ? (
         <div className="no-users">
@@ -35,8 +35,8 @@ const UserList = ({ users, onUserSelect, loading, selectedUser, onlineUsers, unr
                 <div className="user-id">
                   {user.userId}
                 </div>
-                <div className={`user-status ${onlineUsers.has(user.userId) ? 'online' : 'offline'}`}>
-                  {onlineUsers.has(user.userId) ? 'Online' : 'Offline'}
+                <div className={`user-status ${onlineUsers.has(user.userId) ? 'online' : 'available'}`}>
+                  {onlineUsers.has(user.userId) ? 'Online' : 'available'}
                 </div>
               </div>
             </div>

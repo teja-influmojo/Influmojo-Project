@@ -23,7 +23,7 @@ const AgentUserList = ({ users, onUserSelect, onlineUsers, loading }) => {
       {users.map((user) => (
         <div
           key={user.userId}
-          className={`user-item ${onlineUsers.has(user.userId) ? 'online' : 'offline'}`}
+          className={`user-item ${onlineUsers.has(user.userId) ? 'online' : 'available'}`}
           onClick={() => onUserSelect(user)}
         >
           <div className="user-avatar">
@@ -35,10 +35,10 @@ const AgentUserList = ({ users, onUserSelect, onlineUsers, loading }) => {
               {user.nickname || user.userId}
             </div>
             <div className="user-status">
-              <span className={`status-indicator ${onlineUsers.has(user.userId) ? 'online' : 'offline'}`}>
+              <span className={`status-indicator ${onlineUsers.has(user.userId) ? 'online' : 'available'}`}>
                 ●
               </span>
-              {onlineUsers.has(user.userId) ? 'Online' : 'Offline'}
+              {onlineUsers.has(user.userId) ? 'Online' : 'available'}
             </div>
           </div>
           

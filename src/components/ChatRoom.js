@@ -24,17 +24,18 @@ const ChatRoom = ({ currentUser, onLogout }) => {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState('');
   const [confirmedDate, setConfirmedDate] = useState(null);
+  const [profanityErrorCount, setProfanityErrorCount] = useState(0);
+  const [isChatBlocked, setIsChatBlocked] = useState(false);
 
   // Keep refs in sync
   useEffect(() => {
     currentChannelRef.current = channel;
   }, [channel]);
 
-  // Load users on component mount (only for Bob)
+  // Load users on component mount
   useEffect(() => {
-    if (currentUser.userId === 'user2') { // Bob's user ID
+    // Load users for all roles
     loadUsers();
-    }
   }, [currentUser.userId]);
 
   // Set up message handlers and presence
@@ -52,15 +53,12 @@ const ChatRoom = ({ currentUser, onLogout }) => {
         console.log('From:', message._sender.userId);
         console.log('Channel URL:', receivedChannel.url);
         
-        // Check if this message is for the Alice-Bob conversation
-        const channelMembers = receivedChannel.members.map(member => member.userId);
-        const isAliceBobConversation = channelMembers.includes('user1') && 
-                                     channelMembers.includes('user2');
-        
-        if (!isAliceBobConversation) {
-          console.log('Ignoring message - not Alice-Bob conversation');
-          return;
-        }
+        // Check if this message is for the current active channel
+        const currentChannel = currentChannelRef.current;
+        if (!currentChannel || receivedChannel.url !== currentChannel.url) {
+           console.log('Ignoring message - not for current active channel');
+           return;
+         }
 
         // Update messages state if it's the Alice-Bob conversation
         setMessages(prevMessages => {
@@ -137,11 +135,28 @@ const ChatRoom = ({ currentUser, onLogout }) => {
   const loadUsers = async () => {
     try {
       const applicationUsers = await sendbirdService.getApplicationUsers();
-      // For Bob, only show Alice
-      const otherUsers = applicationUsers.filter(user => 
-        user.userId === 'user1' // Only show Alice
-      );
-      setUsers(otherUsers);
+
+      let filteredUsers = [];
+
+      if (currentUser.userId === 'user1') { // Alice (Brand)
+        // Alice sees Bob (Influencer), Charlie (Agent), and David (Agent)
+        filteredUsers = applicationUsers.filter(user => 
+          ['user2', 'user3', 'user4'].includes(user.userId)
+        );
+      } else if (currentUser.userId === 'user2') { // Bob (Influencer)
+        // Bob sees only Alice (Brand)
+        filteredUsers = applicationUsers.filter(user => 
+          user.userId === 'user1'
+        );
+      } else if (['user3', 'user4'].includes(currentUser.userId)) { // Charlie or David (Support Agents)
+        // Agents see all users except themselves
+        filteredUsers = applicationUsers.filter(user => 
+          user.userId !== currentUser.userId
+        );
+      }
+      // Add other roles here if needed
+
+      setUsers(filteredUsers);
     } catch (error) {
       console.error('Failed to load users:', error);
     }
@@ -207,8 +222,8 @@ const ChatRoom = ({ currentUser, onLogout }) => {
     try {
       console.log('Starting chat...');
       
-      const userIds = ['user1', 'user2'];
-      const channelName = `Alice & Bob Chat`;
+      const userIds = [currentUser.userId, targetUser.userId]; // Current user and selected user
+      const channelName = `${currentUser.nickname} & ${targetUser.nickname} Chat`;
       
       console.log('Creating/getting channel for userIds:', userIds);
       
@@ -247,20 +262,39 @@ const ChatRoom = ({ currentUser, onLogout }) => {
       return;
     }
 
+    if (isChatBlocked) {
+      console.log('Chat is blocked for this user.');
+      return;
+    }
+
     const trimmedMessage = messageText.trim();
 
     // Client-side check for personal information or spam links
     if (emailRegex.test(trimmedMessage) || phoneRegex.test(trimmedMessage)) {
       setErrorDialogMessage('DO not share personal information trying to go off platform');
       setShowErrorDialog(true);
-      console.log('Client-side block: Personal information detected.');
+      setProfanityErrorCount(prevCount => {
+        const newCount = prevCount + 1;
+        if (newCount >= 3) {
+          setIsChatBlocked(true);
+        }
+        return newCount;
+      });
+      console.log('Client-side block: Personal information detected. Error count:', profanityErrorCount + 1);
       return; // Stop here, do not send the message
     }
 
     if (spamLinkRegex.test(trimmedMessage)) {
       setErrorDialogMessage('Trying to send malware or spam links is not allowed.');
       setShowErrorDialog(true);
-      console.log('Client-side block: Spam link detected.');
+      setProfanityErrorCount(prevCount => {
+        const newCount = prevCount + 1;
+        if (newCount >= 3) {
+          setIsChatBlocked(true);
+        }
+        return newCount;
+      });
+      console.log('Client-side block: Spam link detected. Error count:', profanityErrorCount + 1);
       return; // Stop here, do not send the message
     }
 
@@ -268,6 +302,8 @@ const ChatRoom = ({ currentUser, onLogout }) => {
       console.log('Sending message:', trimmedMessage);
       const message = await sendbirdService.sendMessage(trimmedMessage);
       console.log('Message sent successfully:', message);
+
+      setProfanityErrorCount(0);
 
       // Immediately add the sent message to the local state for instant feedback
       setMessages(prevMessages => {
@@ -299,6 +335,16 @@ const ChatRoom = ({ currentUser, onLogout }) => {
       if (error.message && error.message.includes('blocked by profanity filter')) {
         setErrorDialogMessage('Profanity is blocked by the application. Please remove offensive words.');
         setShowErrorDialog(true);
+        setProfanityErrorCount(prevCount => {
+          const newCount = prevCount + 1;
+          if (newCount >= 3) {
+            setIsChatBlocked(true);
+          } else {
+             // Maybe hide dialog after a delay if not blocked?
+          }
+          return newCount;
+        });
+        console.log('Sendbird block: Profanity detected. Error count:', profanityErrorCount + 1);
       } else {
         // Handle other potential sending errors
         setErrorDialogMessage('Failed to send message: ' + error.message);
@@ -387,6 +433,14 @@ const ChatRoom = ({ currentUser, onLogout }) => {
 
   const handleDateConfirmed = (date) => {
     setConfirmedDate(date);
+    // Send the date as a message in the chat
+    const formattedDate = date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    sendMessage(`📅 Date confirmed: ${formattedDate}`);
     // Optionally, clear the confirmed date after some time
     // setTimeout(() => setConfirmedDate(null), 5000); // Clear after 5 seconds
   };
@@ -400,16 +454,11 @@ const ChatRoom = ({ currentUser, onLogout }) => {
             Logout
           </button>
         </div>
-        {channel && (
+        {channel && selectedUser && (
           <div className="channel-info">
             <h3>
-              {currentUser.userId === 'user1' ? (
-                <>Chatting with Bob</>
-              ) : (
-                <>Chatting with Alice</>
-              )}
-              {((currentUser.userId === 'user1' && onlineUsers.has('user2')) ||
-                (currentUser.userId === 'user2' && onlineUsers.has('user1'))) && (
+              Chatting with {selectedUser.nickname}
+              {(onlineUsers.has(selectedUser.userId)) && (
                 <span className="online-indicator">● Online</span>
               )}
               {unreadCount > 0 && (
@@ -422,18 +471,26 @@ const ChatRoom = ({ currentUser, onLogout }) => {
 
       <div className="chat-content">
         <div className="users-panel">
-          {currentUser.userId === 'user1' ? (
-            <PackageList onPurchaseComplete={startChat} />
-          ) : (
-          <UserList 
-            users={users} 
-            onUserSelect={startChat}
-            loading={loading}
-            selectedUser={selectedUser}
-              onlineUsers={onlineUsers}
-              unreadCounts={unreadCount}
-          />
-          )}
+          {(() => {
+            let userListHeader = 'Available Users'; // Default for agents
+            if (currentUser.userId === 'user1') { // Alice (Brand)
+              userListHeader = 'Order Accepted  ✔';
+            } else if (currentUser.userId === 'user2') { // Bob (Influencer)
+              userListHeader = 'Order Accepted  ✔';
+            }
+
+            return (
+              <UserList 
+                users={users} 
+                onUserSelect={startChat}
+                loading={loading}
+                selectedUser={selectedUser}
+                onlineUsers={onlineUsers}
+                unreadCounts={unreadCount}
+                headerText={userListHeader}
+              />
+            );
+          })()}
         </div>
 
         <div className="messages-panel">
@@ -444,19 +501,26 @@ const ChatRoom = ({ currentUser, onLogout }) => {
                 currentUser={currentUser}
                 onMessageClick={handleMessageClick}
               />
-              <MessageInput 
-                onSendMessage={sendMessage}
-                onSendFile={sendFile}
-                disabled={loading}
-                onDateConfirmed={handleDateConfirmed}
-              />
+              {isChatBlocked ? (
+                <div className="chat-blocked-message">
+                  <p>You have been blocked from sending messages due to repeated policy violations.</p>
+                  <p>Please contact customer care for assistance.</p>
+                </div>
+              ) : (
+                <MessageInput 
+                  onSendMessage={sendMessage}
+                  onSendFile={sendFile}
+                  disabled={loading || isChatBlocked}
+                  onDateConfirmed={handleDateConfirmed}
+                />
+              )}
             </>
           ) : (
             <div className="no-chat">
               {currentUser.userId === 'user1' ? (
-                <p>Purchase a package to start chatting with Bob!</p>
+                <p>Purchase a package to start chatting!</p>
               ) : (
-                <p>Select Alice from the left panel to start chatting!</p>
+                <p>Select a user from the left panel to start chatting!</p>
               )}
             </div>
           )}

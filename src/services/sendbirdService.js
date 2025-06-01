@@ -12,6 +12,33 @@ const createSendBirdService = () => {
   let presenceHandlers = [];
   let globalHandlerSetup = false;
 
+  const PREDEFINED_USERS = [
+    {
+      userId: 'user1',
+      nickname: 'Alice',
+      profileUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alice',
+      role: 'brand'
+    },
+    {
+      userId: 'user2',
+      nickname: 'Bob',
+      profileUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Bob',
+      role: 'influencer'
+    },
+    {
+      userId: 'user3',
+      nickname: 'Charlie',
+      profileUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Charlie',
+      role: 'agent'
+    },
+    {
+      userId: 'user4',
+      nickname: 'David',
+      profileUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=David',
+      role: 'agent'
+    }
+  ];
+
   // Initialize SendBird instance
   const initializeSendBird = () => {
     if (!sb) {
