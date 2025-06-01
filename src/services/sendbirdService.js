@@ -258,7 +258,7 @@ const createSendBirdService = () => {
     return new Promise((resolve, reject) => {
       currentChannel.sendUserMessage(params, (sentMessage, error) => {
         if (error) {
-          console.error('Failed to send message:', error);
+          console.error('Failed to send message:', error.message);
           reject(error);
           return;
         }
@@ -958,6 +958,158 @@ const createSendBirdService = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  // Moderation functions
+  const canModerate = (channel) => {
+    if (!channel || !currentUser) return false;
+    
+    // Check if user is an operator
+    const isOperator = channel.operators && Array.isArray(channel.operators) && 
+      channel.operators.some(op => op.userId === currentUser.userId);
+    
+    // Check if user is the channel creator
+    const isCreator = channel.createdBy === currentUser.userId;
+    
+    return isOperator || isCreator;
+  };
+
+  const isCurrentUserOperator = (channel) => {
+    if (!channel || !currentUser) return false;
+    return channel.operators && Array.isArray(channel.operators) && 
+      channel.operators.some(op => op.userId === currentUser.userId);
+  };
+
+  const reportMessage = async (message, category, description) => {
+    const sendbird = initializeSendBird();
+    return new Promise((resolve, reject) => {
+      sendbird.reportMessage(message, category, description, (response, error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(response);
+      });
+    });
+  };
+
+  const reportUser = async (userId, category, description) => {
+    const sendbird = initializeSendBird();
+    return new Promise((resolve, reject) => {
+      sendbird.reportUser(userId, category, description, (response, error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(response);
+      });
+    });
+  };
+
+  const reportChannel = async (channel, category, description) => {
+    const sendbird = initializeSendBird();
+    return new Promise((resolve, reject) => {
+      sendbird.reportChannel(channel.url, category, description, (response, error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(response);
+      });
+    });
+  };
+
+  const deleteMessage = async (message) => {
+    const sendbird = initializeSendBird();
+    return new Promise((resolve, reject) => {
+      sendbird.deleteMessage(message, (response, error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(response);
+      });
+    });
+  };
+
+  const banUser = async (channel, userId, reason, duration = -1) => {
+    const sendbird = initializeSendBird();
+    return new Promise((resolve, reject) => {
+      sendbird.banUser(userId, reason, duration, (response, error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(response);
+      });
+    });
+  };
+
+  const unbanUser = async (channel, userId) => {
+    const sendbird = initializeSendBird();
+    return new Promise((resolve, reject) => {
+      sendbird.unbanUser(userId, (response, error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(response);
+      });
+    });
+  };
+
+  const muteUser = async (channel, userId, reason, duration = -1) => {
+    const sendbird = initializeSendBird();
+    return new Promise((resolve, reject) => {
+      sendbird.muteUser(userId, reason, duration, (response, error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(response);
+      });
+    });
+  };
+
+  const unmuteUser = async (channel, userId) => {
+    const sendbird = initializeSendBird();
+    return new Promise((resolve, reject) => {
+      sendbird.unmuteUser(userId, (response, error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(response);
+      });
+    });
+  };
+
+  const getBannedUsers = async (channel) => {
+    const sendbird = initializeSendBird();
+    return new Promise((resolve, reject) => {
+      const query = sendbird.createBannedUserListQuery(channel.url);
+      query.next((bannedUsers, error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(bannedUsers);
+      });
+    });
+  };
+
+  const getMutedUsers = async (channel) => {
+    const sendbird = initializeSendBird();
+    return new Promise((resolve, reject) => {
+      const query = sendbird.createMutedUserListQuery(channel.url);
+      query.next((mutedUsers, error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(mutedUsers);
+      });
+    });
+  };
+
   // Return public API
   return {
     // Connection
@@ -1011,7 +1163,21 @@ const createSendBirdService = () => {
     
     // File download methods
     downloadFile,
-    getFilePreview
+    getFilePreview,
+    
+    // Moderation functions
+    canModerate,
+    isCurrentUserOperator,
+    reportMessage,
+    reportUser,
+    reportChannel,
+    deleteMessage,
+    banUser,
+    unbanUser,
+    muteUser,
+    unmuteUser,
+    getBannedUsers,
+    getMutedUsers,
   };
 };
 

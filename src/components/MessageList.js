@@ -1,7 +1,7 @@
 // src/components/MessageList.js
 import React, { useEffect, useRef } from 'react';
 
-const MessageList = ({ messages, currentUser }) => {
+const MessageList = ({ messages, currentUser, onMessageClick }) => {
   const messagesEndRef = useRef(null);
 
   // Auto-scroll to bottom when new messages arrive
@@ -119,13 +119,22 @@ const MessageList = ({ messages, currentUser }) => {
 
   const renderMessage = (message) => {
     const isCurrentUser = message._sender.userId === currentUser.userId;
-    const messageClass = `message ${isCurrentUser ? 'sent' : 'received'}`;
+    
+    // Check if the message is profanity filtered (contains only asterisks)
+    const isProfanityFiltered = /^[\*]+$/.test(message.message);
+
+    const messageClass = `message ${isCurrentUser ? 'sent' : 'received'} ${isProfanityFiltered ? 'profanity-warning' : ''}`;
 
     // Check if it's a file message
     const isFileMessage = message.messageType === 'file';
 
     return (
-      <div key={message.messageId || message.reqId} className={messageClass}>
+      <div 
+        key={message.messageId || message.reqId} 
+        className={messageClass}
+        onClick={() => onMessageClick && onMessageClick(message)}
+        style={{ cursor: 'pointer' }}
+      >
         <div className="message-content">
           <div className="message-header">
             <span className="sender-name">
@@ -141,7 +150,7 @@ const MessageList = ({ messages, currentUser }) => {
               renderFileMessage(message)
             ) : (
               <div className="text-message">
-            {message.message}
+                {message.message}
               </div>
             )}
           </div>

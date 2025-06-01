@@ -5,6 +5,8 @@ import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import UserList from './UserList';
 import PackageList from './PackageList';
+import ModerationPanel from './ModerationPanel';
+import ErrorDialog from './ErrorDialog';
 
 const ChatRoom = ({ currentUser, onLogout }) => {
   const [messages, setMessages] = useState([]);
@@ -14,9 +16,13 @@ const ChatRoom = ({ currentUser, onLogout }) => {
   const [loading, setLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [onlineUsers, setOnlineUsers] = useState(new Set());
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [showModerationPanel, setShowModerationPanel] = useState(false);
   const messageHandlerRef = useRef(null);
   const currentChannelRef = useRef(null);
   const isLoadingMessagesRef = useRef(false);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [errorDialogMessage, setErrorDialogMessage] = useState('');
 
   // Keep refs in sync
   useEffect(() => {
@@ -227,33 +233,76 @@ const ChatRoom = ({ currentUser, onLogout }) => {
     }
   };
 
+  // Common regex patterns for emails and phone numbers
+  // Note: These are basic patterns and may not cover all formats or be perfect.
+  const emailRegex = /[\w._%+-]+@[\w.-]+\.[\w]{2,}/;
+  const phoneRegex = /(\+\d{1,2}\s?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/;
+  // Regex pattern for common spam/shortened links
+  const spamLinkRegex = /\b(?:https?:\/\/)?(?:www\.)?(?:bit\.ly|tinyurl|shorturl|t\.co|goo\.gl|ow\.ly|buff\.ly)\/\w+/;
+
   const sendMessage = async (messageText) => {
     if (!channel || !messageText.trim()) {
       console.log('Cannot send message - no channel or empty message');
       return;
     }
 
+    const trimmedMessage = messageText.trim();
+
+    // Client-side check for personal information or spam links
+    if (emailRegex.test(trimmedMessage) || phoneRegex.test(trimmedMessage)) {
+      setErrorDialogMessage('DO not share personal information trying to go off platform');
+      setShowErrorDialog(true);
+      console.log('Client-side block: Personal information detected.');
+      return; // Stop here, do not send the message
+    }
+
+    if (spamLinkRegex.test(trimmedMessage)) {
+      setErrorDialogMessage('Trying to send malware or spam links is not allowed.');
+      setShowErrorDialog(true);
+      console.log('Client-side block: Spam link detected.');
+      return; // Stop here, do not send the message
+    }
+
     try {
-      console.log('Sending message:', messageText.trim());
-      const message = await sendbirdService.sendMessage(messageText.trim());
+      console.log('Sending message:', trimmedMessage);
+      const message = await sendbirdService.sendMessage(trimmedMessage);
       console.log('Message sent successfully:', message);
-      
+
+      // Immediately add the sent message to the local state for instant feedback
       setMessages(prevMessages => {
+        // Check if the message already exists (e.g., if the global handler processed it very quickly)
         const exists = prevMessages.some(msg => 
           msg.messageId === message.messageId || 
-          (msg.reqId && msg.reqId === message.reqId)
+          (msg.reqId && message.reqId && msg.reqId === message.reqId)
         );
         
-        if (exists) {
-          return prevMessages;
+        if (!exists) {
+          return [...prevMessages, message];
+        } else {
+          // If it exists, find and update it (e.g., replace temporary message with server-acked one)
+          return prevMessages.map(msg => 
+            (msg.reqId && message.reqId && msg.reqId === message.reqId) || msg.messageId === message.messageId
+            ? message : msg
+          );
         }
-        
-        return [...prevMessages, message];
       });
-      
+
+      // Auto-scroll after sending message
+      // This is now handled by the useEffect in MessageList
+
     } catch (error) {
-      console.error('Failed to send message:', error);
-      alert('Failed to send message. Please try again.');
+      console.error('Failed to send message:', error.message);
+      // Check if the error is due to the profanity filter
+      // Since we did client-side checks for personal info,
+      // any block error from Sendbird is now likely for general profanity
+      if (error.message && error.message.includes('blocked by profanity filter')) {
+        setErrorDialogMessage('Profanity is blocked by the application. Please remove offensive words.');
+        setShowErrorDialog(true);
+      } else {
+        // Handle other potential sending errors
+        setErrorDialogMessage('Failed to send message: ' + error.message);
+        setShowErrorDialog(true);
+      }
     }
   };
 
@@ -293,7 +342,7 @@ const ChatRoom = ({ currentUser, onLogout }) => {
       setMessages(prevMessages => {
         const exists = prevMessages.some(msg => 
           msg.messageId === fileMessage.messageId || 
-          (msg.reqId && msg.reqId === fileMessage.reqId)
+          (msg.reqId && fileMessage.reqId && msg.reqId === fileMessage.reqId)
         );
         
         if (exists) {
@@ -319,6 +368,19 @@ const ChatRoom = ({ currentUser, onLogout }) => {
       onLogout();
     } catch (error) {
       console.error('Logout failed:', error);
+    }
+  };
+
+  const handleMessageClick = (message) => {
+    setSelectedMessage(message);
+    setShowModerationPanel(true);
+  };
+
+  const handleModerationAction = (action, data) => {
+    console.log('Moderation action:', action, data);
+    // Refresh messages if needed
+    if (channel) {
+      loadMessages(channel, true);
     }
   };
 
@@ -373,6 +435,7 @@ const ChatRoom = ({ currentUser, onLogout }) => {
               <MessageList 
                 messages={messages} 
                 currentUser={currentUser}
+                onMessageClick={handleMessageClick}
               />
               <MessageInput 
                 onSendMessage={sendMessage}
@@ -391,6 +454,26 @@ const ChatRoom = ({ currentUser, onLogout }) => {
           )}
         </div>
       </div>
+
+      {showModerationPanel && selectedMessage && (
+        <ModerationPanel
+          message={selectedMessage}
+          channel={channel}
+          currentUser={currentUser}
+          onClose={() => {
+            setShowModerationPanel(false);
+            setSelectedMessage(null);
+          }}
+          onModerationAction={handleModerationAction}
+        />
+      )}
+
+      {showErrorDialog && (
+        <ErrorDialog 
+          message={errorDialogMessage}
+          onClose={() => setShowErrorDialog(false)}
+        />
+      )}
     </div>
   );
 };

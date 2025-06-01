@@ -1,11 +1,14 @@
 // src/components/MessageInput.js
 import React, { useState, useRef } from 'react';
 import EmojiPicker from './EmojiPicker';
+import './MessageInput.css';
 
 const MessageInput = ({ onSendMessage, onSendFile, disabled }) => {
   const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
   const videoInputRef = useRef(null);
@@ -38,11 +41,12 @@ const MessageInput = ({ onSendMessage, onSendFile, disabled }) => {
     if (!files.length || !onSendFile) return;
 
     setIsUploading(true);
+    setUploadProgress(0);
     try {
       // Show upload progress
       const progressCallback = (status, progress) => {
         console.log(`File upload ${status}: ${progress}%`);
-        // You can update UI to show progress here
+        setUploadProgress(progress);
       };
 
       if (files.length === 1) {
@@ -64,22 +68,33 @@ const MessageInput = ({ onSendMessage, onSendFile, disabled }) => {
       alert('File upload failed. Please try again.');
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
       // Reset file input
       e.target.value = '';
     }
   };
 
-  const handleUrlUpload = async (url, fileName, fileType, fileSize) => {
-    if (!url || !onSendFile) return;
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
 
-    setIsUploading(true);
-    try {
-      await onSendFile(url, fileName, fileType, fileSize);
-    } catch (error) {
-      console.error('URL upload failed:', error);
-      alert('URL upload failed. Please try again.');
-    } finally {
-      setIsUploading(false);
+  const handleDrop = (e) => {
+        e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      const fileType = file.type.startsWith('image/') ? 'image' :
+                      file.type.startsWith('video/') ? 'video' :
+                      file.type.startsWith('audio/') ? 'audio' : 'file';
+      handleFileSelect({ target: { files: [file] } }, fileType);
     }
   };
 
@@ -102,65 +117,82 @@ const MessageInput = ({ onSendMessage, onSendFile, disabled }) => {
     }
   };
 
-  return (
+      return (
     <div className="message-input">
       <form onSubmit={handleSubmit}>
         <div className="input-container">
-          {/* File Upload Buttons */}
-          <div className="upload-buttons">
-            <button
-              type="button"
-              onClick={() => triggerFileInput(imageInputRef)}
-              disabled={disabled || isUploading}
-              className="upload-btn image-btn"
-              title="Upload Image"
-            >
-              📷
-            </button>
-            <button
-              type="button"
-              onClick={() => triggerFileInput(videoInputRef)}
-              disabled={disabled || isUploading}
-              className="upload-btn video-btn"
-              title="Upload Video"
-            >
-              🎥
-            </button>
-            <button
-              type="button"
-              onClick={() => triggerFileInput(audioInputRef)}
-              disabled={disabled || isUploading}
-              className="upload-btn audio-btn"
-              title="Upload Audio"
-            >
-              🎵
-            </button>
-            <button
-              type="button"
-              onClick={() => triggerFileInput(documentInputRef)}
-              disabled={disabled || isUploading}
-              className="upload-btn document-btn"
-              title="Upload Document"
-            >
-              📄
-            </button>
-            <button
-              type="button"
-              onClick={() => triggerFileInput(fileInputRef)}
-              disabled={disabled || isUploading}
-              className="upload-btn file-btn"
-              title="Upload File"
-            >
-              📎
-            </button>
+          {/* File Upload Area */}
+          <div 
+            className={`upload-area ${dragActive ? 'drag-active' : ''}`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+          >
+            <div className="upload-buttons">
+              <button
+                type="button"
+                onClick={() => triggerFileInput(imageInputRef)}
+                disabled={disabled || isUploading}
+                className="upload-btn image-btn"
+                title="Upload Image"
+              >
+                <i className="fas fa-image"></i>
+                <span>Image</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => triggerFileInput(videoInputRef)}
+                disabled={disabled || isUploading}
+                className="upload-btn video-btn"
+                title="Upload Video"
+              >
+                <i className="fas fa-video"></i>
+                <span>Video</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => triggerFileInput(audioInputRef)}
+                disabled={disabled || isUploading}
+                className="upload-btn audio-btn"
+                title="Upload Audio"
+              >
+                <i className="fas fa-music"></i>
+                <span>Audio</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => triggerFileInput(documentInputRef)}
+                disabled={disabled || isUploading}
+                className="upload-btn document-btn"
+                title="Upload Document"
+              >
+                <i className="fas fa-file-alt"></i>
+                <span>Document</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => triggerFileInput(fileInputRef)}
+                disabled={disabled || isUploading}
+                className="upload-btn file-btn"
+                title="Upload File"
+              >
+                <i className="fas fa-paperclip"></i>
+                <span>File</span>
+              </button>
+              </div>
+            <div className="drag-drop-hint">
+              <i className="fas fa-cloud-upload-alt"></i>
+              <span>Drag & drop files here</span>
+            </div>
           </div>
-
+          
           {/* Message Input Area */}
           <div className="text-input-container">
-            <textarea
+              <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
+                onKeyPress={handleKeyPress}
               placeholder="Type your message here..."
               disabled={disabled || isUploading}
               rows="1"
@@ -175,19 +207,26 @@ const MessageInput = ({ onSendMessage, onSendFile, disabled }) => {
               className="emoji-btn"
               title="Add Emoji"
             >
-              😊
+              <i className="far fa-smile"></i>
             </button>
-          </div>
-
+                </div>
+                
           {/* Send Button */}
-          <button 
-            type="submit" 
+                <button 
+                  type="submit" 
             disabled={disabled || !message.trim() || isUploading}
-            className="send-button"
-          >
-            {isUploading ? '⏳' : 'Send'}
+                  className="send-button"
+                >
+            {isUploading ? (
+              <div className="upload-progress">
+                <div className="progress-bar" style={{ width: `${uploadProgress}%` }}></div>
+                <span>{uploadProgress}%</span>
+              </div>
+            ) : (
+              <i className="fas fa-paper-plane"></i>
+            )}
           </button>
-        </div>
+            </div>
 
         {/* Emoji Picker */}
         {showEmojiPicker && (
@@ -241,8 +280,8 @@ const MessageInput = ({ onSendMessage, onSendFile, disabled }) => {
         multiple
         style={{ display: 'none' }}
       />
-    </div>
-  );
+        </div>
+      );
 };
 
 export default MessageInput;
