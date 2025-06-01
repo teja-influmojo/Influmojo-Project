@@ -23,6 +23,7 @@ const ChatRoom = ({ currentUser, onLogout }) => {
   const isLoadingMessagesRef = useRef(false);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState('');
+  const [confirmedDate, setConfirmedDate] = useState(null);
 
   // Keep refs in sync
   useEffect(() => {
@@ -384,6 +385,12 @@ const ChatRoom = ({ currentUser, onLogout }) => {
     }
   };
 
+  const handleDateConfirmed = (date) => {
+    setConfirmedDate(date);
+    // Optionally, clear the confirmed date after some time
+    // setTimeout(() => setConfirmedDate(null), 5000); // Clear after 5 seconds
+  };
+
   return (
     <div className="chat-room">
       <div className="chat-header">
@@ -441,6 +448,7 @@ const ChatRoom = ({ currentUser, onLogout }) => {
                 onSendMessage={sendMessage}
                 onSendFile={sendFile}
                 disabled={loading}
+                onDateConfirmed={handleDateConfirmed}
               />
             </>
           ) : (
@@ -473,6 +481,13 @@ const ChatRoom = ({ currentUser, onLogout }) => {
           message={errorDialogMessage}
           onClose={() => setShowErrorDialog(false)}
         />
+      )}
+
+      {confirmedDate && (
+        <div className="date-confirmed-indicator">
+          <p>Confirmed Date:</p>
+          <p>{confirmedDate.toLocaleDateString()}</p>
+        </div>
       )}
     </div>
   );

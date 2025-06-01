@@ -2,10 +2,17 @@
 import React, { useState, useRef } from 'react';
 import EmojiPicker from './EmojiPicker';
 import './MessageInput.css';
+import DatePicker, { registerLocale } from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { enUS } from 'date-fns/locale';
 
-const MessageInput = ({ onSendMessage, onSendFile, disabled }) => {
+registerLocale('enUS', enUS);
+
+const MessageInput = ({ onSendMessage, onSendFile, disabled, onDateConfirmed }) => {
   const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
@@ -117,6 +124,20 @@ const MessageInput = ({ onSendMessage, onSendFile, disabled }) => {
     }
   };
 
+  const handleDateSelect = (date) => {
+    setSelectedDate(date);
+    // Optional: Format the date and send it as a message immediately
+    if (onDateConfirmed) {
+      onDateConfirmed(date);
+    }
+    setShowCalendar(false);
+    setSelectedDate(null); // Reset selected date after sending
+  };
+
+  const toggleCalendar = () => {
+    setShowCalendar(prev => !prev);
+  };
+
       return (
     <div className="message-input">
       <form onSubmit={handleSubmit}>
@@ -180,6 +201,16 @@ const MessageInput = ({ onSendMessage, onSendFile, disabled }) => {
                 <i className="fas fa-paperclip"></i>
                 <span>File</span>
               </button>
+              <button
+                type="button"
+                onClick={toggleCalendar}
+                disabled={disabled}
+                className="upload-btn calendar-btn"
+                title="Select Date"
+              >
+                <i className="fas fa-calendar-alt"></i>
+                <span>Date</span>
+              </button>
               </div>
             <div className="drag-drop-hint">
               <i className="fas fa-cloud-upload-alt"></i>
@@ -189,6 +220,16 @@ const MessageInput = ({ onSendMessage, onSendFile, disabled }) => {
           
           {/* Message Input Area */}
           <div className="text-input-container">
+            {showCalendar && (
+              <DatePicker
+                selected={selectedDate}
+                onChange={handleDateSelect}
+                inline
+                locale="enUS"
+                dateFormat="MM/dd/yyyy"
+                className="calendar-popup"
+              />
+            )}
               <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
