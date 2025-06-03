@@ -1,10 +1,24 @@
 // src/components/UserList.js
 import React from 'react';
 
-const UserList = ({ users, onUserSelect, loading, selectedUser, onlineUsers, unreadCounts, headerText }) => {
+const UserList = ({ users, onUserSelect, loading, selectedUser, onlineUsers, unreadCounts, currentUser }) => {
+  
+  const renderHeading = () => {
+    if (!currentUser) return null;
+
+    if (['user3', 'user4'].includes(currentUser.userId)) { // Charlie or David
+      return <h3>Incoming Users</h3>;
+    } else if (currentUser.userId === 'user2') { // Bob (Influencer)
+      return <h3>Order Accepted ✔</h3>; // Heading for Bob seeing Alice
+    } else if (currentUser.userId === 'user1') { // Alice (Brand)
+       return <h3>Influencers / Agents</h3>; // Heading for Alice seeing others
+    }
+    return <h3>Users</h3>; // Default heading
+  };
+
   return (
     <div className="user-list">
-      <h3>{headerText}</h3>
+      {renderHeading()}
       
       {users.length === 0 ? (
         <div className="no-users">

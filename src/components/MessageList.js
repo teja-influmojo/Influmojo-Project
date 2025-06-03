@@ -150,7 +150,7 @@ const MessageList = ({ messages, currentUser, onMessageClick }) => {
               renderFileMessage(message)
             ) : (
               <div className="text-message">
-                {message.message}
+            {message.message}
               </div>
             )}
           </div>

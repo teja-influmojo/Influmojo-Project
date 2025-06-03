@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import '../styles/Chat.css';
 
 const Login = ({ onLogin }) => {
-  const [selectedUser, setSelectedUser] = useState('');
   const [customUserId, setCustomUserId] = useState('');
   const [customNickname, setCustomNickname] = useState('');
   const [showCustom, setShowCustom] = useState(false);

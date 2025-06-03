@@ -1,5 +1,5 @@
 // src/components/ChatRoom.js
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import sendbirdService from '../services/sendbirdService';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
@@ -32,11 +32,42 @@ const ChatRoom = ({ currentUser, onLogout }) => {
     currentChannelRef.current = channel;
   }, [channel]);
 
+  // Load users based on role
+  const loadUsers = useCallback(async () => {
+    try {
+      const applicationUsers = await sendbirdService.getApplicationUsers();
+
+      let filteredUsers = [];
+
+      if (currentUser.userId === 'user1') { // Alice (Brand)
+        // Alice sees Bob (Influencer), Charlie (Agent), and David (Agent)
+        filteredUsers = applicationUsers.filter(user => 
+          ['user2', 'user3', 'user4'].includes(user.userId)
+        );
+      } else if (currentUser.userId === 'user2') { // Bob (Influencer)
+        // Bob sees only Alice (Brand)
+        filteredUsers = applicationUsers.filter(user => 
+          user.userId === 'user1'
+        );
+      } else if (['user3', 'user4'].includes(currentUser.userId)) { // Charlie or David (Support Agents)
+        // Agents see all users except themselves
+        filteredUsers = applicationUsers.filter(user => 
+          user.userId !== currentUser.userId
+        );
+      }
+      // Add other roles here if needed
+
+      setUsers(filteredUsers);
+    } catch (error) {
+      console.error('Failed to load users:', error);
+    }
+  }, [currentUser.userId]); // Dependency array for useCallback
+
   // Load users on component mount
   useEffect(() => {
     // Load users for all roles
     loadUsers();
-  }, [currentUser.userId]);
+  }, [currentUser.userId, loadUsers]); // Dependency array for useEffect
 
   // Set up message handlers and presence
   useEffect(() => {
@@ -57,8 +88,8 @@ const ChatRoom = ({ currentUser, onLogout }) => {
         const currentChannel = currentChannelRef.current;
         if (!currentChannel || receivedChannel.url !== currentChannel.url) {
            console.log('Ignoring message - not for current active channel');
-           return;
-         }
+          return;
+        }
 
         // Update messages state if it's the Alice-Bob conversation
         setMessages(prevMessages => {
@@ -131,36 +162,6 @@ const ChatRoom = ({ currentUser, onLogout }) => {
       }
     };
   }, [currentUser.userId]);
-
-  const loadUsers = async () => {
-    try {
-      const applicationUsers = await sendbirdService.getApplicationUsers();
-
-      let filteredUsers = [];
-
-      if (currentUser.userId === 'user1') { // Alice (Brand)
-        // Alice sees Bob (Influencer), Charlie (Agent), and David (Agent)
-        filteredUsers = applicationUsers.filter(user => 
-          ['user2', 'user3', 'user4'].includes(user.userId)
-        );
-      } else if (currentUser.userId === 'user2') { // Bob (Influencer)
-        // Bob sees only Alice (Brand)
-        filteredUsers = applicationUsers.filter(user => 
-          user.userId === 'user1'
-        );
-      } else if (['user3', 'user4'].includes(currentUser.userId)) { // Charlie or David (Support Agents)
-        // Agents see all users except themselves
-        filteredUsers = applicationUsers.filter(user => 
-          user.userId !== currentUser.userId
-        );
-      }
-      // Add other roles here if needed
-
-      setUsers(filteredUsers);
-    } catch (error) {
-      console.error('Failed to load users:', error);
-    }
-  };
 
   const loadMessages = async (targetChannel, preserveLocalMessages = false) => {
     if (isLoadingMessagesRef.current) {
@@ -255,6 +256,8 @@ const ChatRoom = ({ currentUser, onLogout }) => {
   const phoneRegex = /(\+\d{1,2}\s?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/;
   // Regex pattern for common spam/shortened links
   const spamLinkRegex = /\b(?:https?:\/\/)?(?:www\.)?(?:bit\.ly|tinyurl|shorturl|t\.co|goo\.gl|ow\.ly|buff\.ly)\/\w+/;
+  // Regex pattern for short numeric codes
+  const numericCodeRegex = /^\\s*\\d+\\s*$/;
 
   const sendMessage = async (messageText) => {
     if (!channel || !messageText.trim()) {
@@ -269,8 +272,8 @@ const ChatRoom = ({ currentUser, onLogout }) => {
 
     const trimmedMessage = messageText.trim();
 
-    // Client-side check for personal information or spam links
-    if (emailRegex.test(trimmedMessage) || phoneRegex.test(trimmedMessage)) {
+    // Client-side check for personal information, spam links, or numeric codes
+    if (emailRegex.test(trimmedMessage) || phoneRegex.test(trimmedMessage) || numericCodeRegex.test(trimmedMessage)) {
       setErrorDialogMessage('DO not share personal information trying to go off platform');
       setShowErrorDialog(true);
       setProfanityErrorCount(prevCount => {
@@ -302,7 +305,7 @@ const ChatRoom = ({ currentUser, onLogout }) => {
       console.log('Sending message:', trimmedMessage);
       const message = await sendbirdService.sendMessage(trimmedMessage);
       console.log('Message sent successfully:', message);
-
+      
       setProfanityErrorCount(0);
 
       // Immediately add the sent message to the local state for instant feedback
@@ -326,7 +329,7 @@ const ChatRoom = ({ currentUser, onLogout }) => {
 
       // Auto-scroll after sending message
       // This is now handled by the useEffect in MessageList
-
+      
     } catch (error) {
       console.error('Failed to send message:', error.message);
       // Check if the error is due to the profanity filter
@@ -440,7 +443,7 @@ const ChatRoom = ({ currentUser, onLogout }) => {
       month: 'long',
       day: 'numeric'
     });
-    sendMessage(`📅 Date confirmed: ${formattedDate}`);
+    sendMessage(`📅 Delivery date confirmed: ${formattedDate}`);
     // Optionally, clear the confirmed date after some time
     // setTimeout(() => setConfirmedDate(null), 5000); // Clear after 5 seconds
   };
@@ -471,26 +474,19 @@ const ChatRoom = ({ currentUser, onLogout }) => {
 
       <div className="chat-content">
         <div className="users-panel">
-          {(() => {
-            let userListHeader = 'Available Users'; // Default for agents
-            if (currentUser.userId === 'user1') { // Alice (Brand)
-              userListHeader = 'Order Accepted  ✔';
-            } else if (currentUser.userId === 'user2') { // Bob (Influencer)
-              userListHeader = 'Order Accepted  ✔';
-            }
-
-            return (
-              <UserList 
-                users={users} 
-                onUserSelect={startChat}
-                loading={loading}
-                selectedUser={selectedUser}
-                onlineUsers={onlineUsers}
-                unreadCounts={unreadCount}
-                headerText={userListHeader}
-              />
-            );
-          })()}
+          {currentUser.userId === 'user1' ? (
+            <PackageList onPurchaseComplete={startChat} />
+          ) : (
+          <UserList 
+            users={users} 
+            onUserSelect={startChat}
+            loading={loading}
+            selectedUser={selectedUser}
+              onlineUsers={onlineUsers}
+              unreadCounts={unreadCount}
+              currentUser={currentUser}
+          />
+          )}
         </div>
 
         <div className="messages-panel">
@@ -507,12 +503,12 @@ const ChatRoom = ({ currentUser, onLogout }) => {
                   <p>Please contact customer care for assistance.</p>
                 </div>
               ) : (
-                <MessageInput 
-                  onSendMessage={sendMessage}
-                  onSendFile={sendFile}
+              <MessageInput 
+                onSendMessage={sendMessage}
+                onSendFile={sendFile}
                   disabled={loading || isChatBlocked}
                   onDateConfirmed={handleDateConfirmed}
-                />
+              />
               )}
             </>
           ) : (
@@ -549,7 +545,7 @@ const ChatRoom = ({ currentUser, onLogout }) => {
 
       {confirmedDate && (
         <div className="date-confirmed-indicator">
-          <p>Confirmed Date:</p>
+          <p>Delivery date Confirmed:</p>
           <p>{confirmedDate.toLocaleDateString()}</p>
         </div>
       )}

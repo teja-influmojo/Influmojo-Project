@@ -38,8 +38,8 @@ const ModerationPanel = ({ message, channel, currentUser, onClose, onModerationA
   // Check moderation permissions when component mounts or channel changes
   useEffect(() => {
     if (channel && currentUser) {
-      const canModerate = sendbirdService.canModerate(channel);
-      const isOperator = sendbirdService.isCurrentUserOperator(channel);
+  const canModerate = sendbirdService.canModerate(channel);
+  const isOperator = sendbirdService.isCurrentUserOperator(channel);
       setHasModerationRights(canModerate);
       setIsOperator(isOperator);
     }

@@ -1503,83 +1503,61 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.6); /* Slightly darker overlay */
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
-  justify-content: center; /* Center horizontally */
-  align-items: center; /* Center vertically */
-  z-index: 1000; /* Ensure it's above other content */
-  padding: 20px; /* Add some padding for small screens */
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
 }
 
 .error-dialog-content {
   background-color: white;
   padding: 20px;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); /* Stronger shadow */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   text-align: center;
-  max-width: 400px; /* Limit maximum width */
-  width: 100%; /* Use full width up to max-width */
+  max-width: 400px;
+  width: 90%;
   position: relative; /* Needed for close button positioning */
-  display: flex;
-  flex-direction: column;
 }
 
-.error-dialog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.error-dialog-content h4 {
+  color: #dc3545;
+  margin-top: 0;
   margin-bottom: 15px;
-  border-bottom: 1px solid #eee; /* Add a separator */
-  padding-bottom: 10px;
 }
 
-.error-dialog-header h3 {
-  margin: 0;
-  color: #dc3545; /* Red color for error title */
-  font-size: 1.2rem;
-}
-
-.error-dialog-body {
+.error-dialog-content p {
   margin-bottom: 20px;
-  flex-grow: 1; /* Allow body to take up space */
-}
-
-.error-dialog-body p {
-  margin: 0; /* Remove default paragraph margin */
   color: #333;
-  line-height: 1.5;
 }
 
-.error-dialog-footer {
-  padding-top: 10px;
-  border-top: 1px solid #eee; /* Add a separator */
-}
-
-.close-btn {
+.error-dialog-content button {
   background-color: #007bff;
   color: white;
   border: none;
-  padding: 8px 15px; /* Adjusted padding */
+  padding: 10px 20px;
   border-radius: 5px;
   cursor: pointer;
   font-size: 1rem;
   transition: background-color 0.3s ease;
 }
 
-.close-btn:hover {
+.error-dialog-content button:hover {
   background-color: #0056b3;
 }
 
-/* Style for the close button in the header */
-.error-dialog-header .close-btn {
-  background: none; /* Remove background */
-  color: #999; /* Gray color */
-  font-size: 1.5rem; /* Larger size for 'x' */
-  padding: 0; /* Remove padding */
-  transition: color 0.3s ease;
+.error-dialog-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: #999;
 }
 
-.error-dialog-header .close-btn:hover {
+.error-dialog-close:hover {
   color: #555;
-  background: none; /* Ensure background stays none on hover */
 }

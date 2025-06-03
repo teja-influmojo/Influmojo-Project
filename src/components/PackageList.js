@@ -53,7 +53,7 @@ const PackageList = ({ onPurchaseComplete }) => {
         ) : (
           <div className="success-message">
             <p>✅ Purchase Successful!</p>
-            <p>Opening chat...</p>
+            <p>Chat open</p>
           </div>
         )}
       </div>

@@ -829,6 +829,7 @@ const createSendBirdService = () => {
     });
   };
 
+  // Send file message - IMPROVED with progress callback and different upload methods
   const sendFileMessage = async (file, fileType = 'file', progressCallback = null) => {
     return new Promise((resolve, reject) => {
       if (!currentChannel) {
@@ -912,57 +913,57 @@ const createSendBirdService = () => {
   };
 
   // Send multiple files in a single message
-  const sendMultipleFiles = async (files, progressCallback = null) => {
-    return new Promise((resolve, reject) => {
-      if (!currentChannel) {
-        reject(new Error('No active channel'));
-        return;
-      }
+  // const sendMultipleFiles = async (files, progressCallback = null) => {
+  //   return new Promise((resolve, reject) => {
+  //     if (!currentChannel) {
+  //       reject(new Error('No active channel'));
+  //       return;
+  //     }
 
-      const filePromises = files.map(file => {
-        const fileType = getFileTypeFromMime(file.type);
-        return sendFileMessage(file, fileType, progressCallback);
-      });
+  //     const filePromises = files.map(file => {
+  //       const fileType = getFileTypeFromMime(file.type);
+  //       return sendFileMessage(file, fileType, progressCallback);
+  //     });
 
-      Promise.all(filePromises)
-        .then(messages => {
-          console.log('All files uploaded successfully:', messages);
-          resolve(messages);
-        })
-        .catch(error => {
-          console.error('Error uploading files:', error);
-          reject(error);
-        });
-    });
-  };
+  //     Promise.all(filePromises)
+  //       .then(messages => {
+  //         console.log('All files uploaded successfully:', messages);
+  //         resolve(messages);
+  //       })
+  //       .catch(error => {
+  //         console.error('Error uploading files:', error);
+  //         reject(error);
+  //       });
+  //   });
+  // };
 
   // Send file from URL
-  const sendFileFromUrl = async (fileUrl, fileName, fileType, fileSize) => {
-    return new Promise((resolve, reject) => {
-      if (!currentChannel) {
-        reject(new Error('No active channel'));
-        return;
-      }
+  // const sendFileFromUrl = async (fileUrl, fileName, fileType, fileSize) => {
+  //   return new Promise((resolve, reject) => {
+  //     if (!currentChannel) {
+  //       reject(new Error('No active channel'));
+  //       return;
+  //     }
 
-      const params = sb.BaseMessageCreateParams();
-      params.url = fileUrl;
-      params.fileName = fileName;
-      params.fileSize = fileSize;
-      params.customType = fileType;
-      params.requireAuth = true;
+  //     const params = sb.BaseMessageCreateParams();
+  //     params.url = fileUrl;
+  //     params.fileName = fileName;
+  //     params.fileSize = fileSize;
+  //     params.customType = fileType;
+  //     params.requireAuth = true;
 
-      currentChannel.sendFileMessage(params)
-        .onSucceeded((message) => {
-          console.log('File from URL sent successfully:', message);
-          addMessageToCache(currentChannel, message);
-          resolve(message);
-        })
-        .onFailed((error) => {
-          console.error('Failed to send file from URL:', error);
-          reject(error);
-        });
-    });
-  };
+  //     currentChannel.sendFileMessage(params)
+  //       .onSucceeded((message) => {
+  //         console.log('File from URL sent successfully:', message);
+  //         addMessageToCache(currentChannel, message);
+  //         resolve(message);
+  //       })
+  //       .onFailed((error) => {
+  //         console.error('Failed to send file from URL:', error);
+  //         reject(error);
+  //       });
+  //   });
+  // };
 
   // Helper function to determine file type from MIME type
   const getFileTypeFromMime = (mimeType) => {
